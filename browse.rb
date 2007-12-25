@@ -27,21 +27,17 @@ class VirtualPaths
     self
   end
 
-  def browse(path)
+  def match(path)
     if parse = path.match(/^\/\/([^\/]*)(.*)/)
       action = parse[1]
 
-      throw String.new("Invalid action '#{action}'!") unless @rules.key?(action)
+      throw String.new("Invalid action '#{action}' !") unless @rules.key?(action)
 
       # parse context
       return @rules[action].parse(parse[2])
     else
-      throw String.new("No match!") unless @rules.key?(action)
+      throw NotVirtualPathException.new("No match!")
     end
-  end
-
-  def complete(path)
-    # FIXME: do something
   end
 
 
@@ -122,15 +118,19 @@ class Rule
     end
 
     def parse_values(s)
+      h = Hash.new
+
       pattern = @format.gsub(/\$\{(.*?)\}/, '(.*?)')
       match = s.match("^#{pattern}$")
 
-      i = 1
-      h = Hash.new
-      @vars.each do |v|
-        h[v] = match[i]
-        i += 1
+      unless match.nil?
+        i = 1
+        @vars.each do |v|
+          h[v] = match[i]
+          i += 1
+        end
       end
+
       return h
     end
   end
@@ -164,7 +164,7 @@ class VirtualContext
 
   def coll()
     @coll = make_coll_filters(@values) if @coll.nil?
-    @coll
+    return @coll
   end
 
   private
@@ -203,7 +203,8 @@ class VirtualXmms2Browser
     @conn = conn
   end
 
-  def list(ctx)
+  def list_current(ctx)
+    puts ctx.nextvars
     res = @conn.coll_query_info(ctx.coll, ctx.nextvars, ctx.allfields)
     res.wait
     res.value.each do |dict|
@@ -211,15 +212,42 @@ class VirtualXmms2Browser
       puts s
     end
   end
+
+  def list_next(ctx)
+    res = @conn.coll_query_info(ctx.coll, ctx.nextvars, ctx.allfields)
+    res.wait
+    res.value.each do |dict|
+      s = ctx.nextformat.gsub(/\$\{(.*?)\}/) {|| dict[$1.to_sym]}
+      puts s
+    end
+  end
+
+  def list_entries(ctx)
+    res = @conn.coll_query_ids(ctx.coll, ctx.allfields)
+    res.wait
+    res.value.each do |id|
+      info = @conn.medialib_get_info(id)
+      info.wait
+      dict = info.value
+      puts "#{dict[:tracknr]} - #{dict[:title]}"
+    end
+  end
 end
 
 
+# check args
+unless ARGV.size == 2
+  puts "usage: browse.rb <complete|browse|search> PATH"
+  exit(1)
+end
+
+# hello XMMS2
 x2 = Xmms::Client.new("browse")
 x2.connect
+show = VirtualXmms2Browser.new(x2)
 
 # Load grammmar from file
 vp = VirtualPaths.new
-
 fp = File.open("vpaths.conf")
 while(line = fp.gets)
   line.scan(/(.*?) = (.*)/) do |action, path|
@@ -227,21 +255,35 @@ while(line = fp.gets)
   end
 end
 
-show = VirtualXmms2Browser.new(x2)
+# parse user input
+ctx = vp.match(ARGV[1])
 
-
-unless ARGV.size == 1
-  puts "usage: browse.rb PATH"
+# display corresponding result
+case ARGV[0]
+when "complete"
+  show.list_current(ctx)
+when "browse"
+  show.list_next(ctx)
+when "search"
+  show.list_entries(ctx)
+else
+  puts "Invalid action: #{ARGV[0]}"
   exit(1)
 end
 
-ctx = vp.browse(ARGV[0])
-show.list(ctx)
+exit(0)
 
 
 # TODO:
 # - list/match actions
-# - differentiate browse vs completion
+# - differentiate complete/browse/search
+#   * complete: propose the possible completions of the path.
+#   * browse: complete the next path element.
+#   * search: display the entries matching the path.
+# - cannot match path tokens with multiple elems if only one is given
+#   ( e.g. .../Heroes/1* )
+# - what output format to use when searching with an incomplete path?
+#   just ${n} - ${title}, or the whole missing path e.g. ${album}/${n} - ${title} ?
 # - tie to shell completion
 
 

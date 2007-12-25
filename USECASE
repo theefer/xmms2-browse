@@ -1,0 +1,133 @@
+
+$ xmms2-browse complete //
+-all vpaths-
+
+$ xmms2-browse browse //
+-all vpaths-
+
+$ xmms2-browse search //
+-none-
+
+
+$ xmms2-browse complete //Arti
+//Arti
+
+$ xmms2-browse browse //Arti
+-none-
+
+$ xmms2-browse search //Arti
+-none-
+
+
+$ xmms2-browse complete //Arti*
+//Arti
+
+$ xmms2-browse browse //Arti*
+//Arti
+
+$ xmms2-browse search //Arti*
+-none-
+
+
+$ xmms2-browse complete //Artists/Ai
+//Artists/Air
+//Artists/Aimee Mann
+
+$ xmms2-browse browse //Artists/Ai
+-none-
+
+$ xmms2-browse search //Artists/Ai
+-none-
+
+
+$ xmms2-browse complete //Artists/Ai*
+//Artists/Air
+//Artists/Aimee Mann
+ _or?_
+-none-
+
+$ xmms2-browse browse //Artists/Ai*
+Air
+Aimee Mann
+
+$ xmms2-browse search //Artists/Ai*
+-all songs by Air or Aimee Mann-
+
+
+$ xmms2-browse complete //Artists/Air
+//Artists/Air
+
+$ xmms2-browse browse //Artists/Air
+-all albums by Air-
+
+$ xmms2-browse search //Artists/Air
+-all songs by Air-
+
+
+$ xmms2-browse complete //Artists/Air/
+//Artists/Air/-all albums by Air-
+
+$ xmms2-browse browse //Artists/Air/
+-all albums by Air-
+
+$ xmms2-browse search //Artists/Air/
+-all songs by Air-
+
+
+
+
+$ xmms2-browse complete //Artists/Pin
+//Artists/Pink
+//Artists/Pink Floyd
+
+$ xmms2-browse browse //Artists/Pin
+-none-
+
+$ xmms2-browse search //Artists/Pin
+-none-
+
+
+$ xmms2-browse complete //Artists/Pin*
+//Artists/Pink
+//Artists/Pink Floyd
+ _or?_
+-none-
+
+$ xmms2-browse browse //Artists/Pin*
+Pink
+Pink Floyd
+
+$ xmms2-browse search //Artists/Pin*
+-all songs by Pink or Pink Floyd-
+
+
+$ xmms2-browse complete //Artists/Pink
+//Artists/Pink
+//Artists/Pink Floyd
+
+$ xmms2-browse browse //Artists/Pink
+-all albums by Pink-
+
+$ xmms2-browse search //Artists/Pink
+-all songs by Pink-
+
+
+$ xmms2-browse complete //Artists/Pink/
+//Artists/Pink/-all albums by Pink-
+
+$ xmms2-browse browse //Artists/Pink/
+-all albums by Pink-
+
+$ xmms2-browse search //Artists/Pink/
+-all songs by Pink-
+
+
+$ xmms2-browse complete //Artists/Pink*/
+//Artists/Pink/-all albums by Pink-
+//Artists/Pink Floyd/-all albums by Pink Floyd-
+
+$ xmms2-browse browse //Artists/Pink*/
+-all albums by Pink or Pink Floyd-
+
+$ xmms2-browse search //Artists/Pink*/
+-all songs by Pink or Pink Floyd-
