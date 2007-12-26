@@ -8,18 +8,19 @@ require './exceptions'
 # Handles the rules for virtual paths.
 class VirtualPaths
 
-  def initialize()
+  def initialize(xc)
     @rules = Hash.new
+    @xc = xc
   end
 
   def add_rule(name, path_spec)
-    throw DuplicateRuleException.new(name) if @rules.key?(name)
+    raise DuplicateRuleException.new(name) if @rules.key?(name)
 
     if path_spec.match(/^\//)
       @rules[name] = make_rule(path_spec)
     else
       # alias for an existing rule, check existence
-      throw BadRefRuleException.new(name, path_spec) unless @rules.key?(path_spec)
+      raise BadRefRuleException.new(name, path_spec) unless @rules.key?(path_spec)
 
       # alias by copying the rule
       @rules[name] = @rules[path_spec]
@@ -27,23 +28,84 @@ class VirtualPaths
     self
   end
 
-  def match(path)
-    if parse = path.match(/^\/\/([^\/]*)(.*)/)
-      action = parse[1]
+  def complete_current(arg)
+    arg += '*' unless arg =~ /\*$/
+    begin
+      ctx = match(arg)
+      print_media_values(ctx.coll, ctx.curr, ctx.allfields, ctx.full?)
+    rescue InvalidActionException
+      fuzzy_complete_action(arg).each do |action|
+        print_element(action, false)
+      end
+    rescue NotVirtualPathException
+      # ignore silently
+    end
+  end
 
-      throw String.new("Invalid action '#{action}' !") unless @rules.key?(action)
+  def list_next(arg)
+    # ignore trailing slash
+    arg = arg[0..-2] if arg =~ /\/$/
+    ctx = match(arg)
+    print_media_values(ctx.coll, ctx.next, ctx.allfields, ctx.full?)
+  end
 
-      # parse context
-      return @rules[action].parse(parse[2])
-    else
-      throw NotVirtualPathException.new("No match!")
+  def list_entries(arg)
+    ctx = match(arg)
+    res = @xc.coll_query_ids(ctx.coll, ctx.allfields)
+    res.wait
+    res.value.each do |id|
+      info = @xc.medialib_get_info(id)
+      info.wait
+      dict = info.value
+      puts "#{dict[:tracknr]} - #{dict[:title]}"
     end
   end
 
 
   private
+
+  def extract_path(s)
+    if parse = s.match(/^\/\/(.*)/)
+      return parse[1]
+    else
+      raise NotVirtualPathException.new("Invalid path!")
+    end
+  end
+
+  def match(s)
+    path = extract_path(s)
+    if parse = path.match(/^([^\/]*)\/?(.*)/)
+      action = match_action(parse[1])
+
+      # parse context
+      return action.parse(parse[2])
+    else
+      raise NotVirtualPathException.new("Invalid path!")
+    end
+  end
+
+  def match_action(action)
+    if @rules.key?(action)
+      return @rules[action] 
+    end
+
+    raise InvalidActionException.new("Invalid action '#{action}' !")
+  end
+
+  def fuzzy_complete_action(s)
+    path = extract_path(s)
+    pattern = path.gsub(/\?/, ".").gsub(/\*/, ".*")
+
+    fuzzy = Array.new
+    @rules.keys.each do |k|
+      fuzzy.push(k) if k.match(/^#{pattern}$/)
+    end
+
+    return fuzzy
+  end
+
   def make_rule(spec)
-    throw InvalidRuleException("Empty rule!") if spec.size < 2
+    raise InvalidRuleException.new("Empty rule!") if spec.size < 2
 
     tokens = spec[1..-1].split('/')
     tokens.pop if !tokens.empty? and tokens[-1].empty?
@@ -56,6 +118,21 @@ class VirtualPaths
     end
 
     return rule
+  end
+
+  def print_media_values(coll, path_item, fields, terminal)
+    res = @xc.coll_query_info(coll, path_item.vars, fields)
+    res.wait
+    res.value.each do |dict|
+      s = path_item.format.gsub(/\$\{(.*?)\}/) {|| dict[$1.to_sym]}
+      print_element(s, terminal)
+    end
+  end
+
+  def print_element(elem, terminal)
+    elem += '/' unless terminal
+    puts elem.gsub(' ', '\ ')
+#    puts elem
   end
 end
 
@@ -73,31 +150,29 @@ class Rule
 
   # Build a VirtualContext from applying the rule to the input.
   def parse(path)
-    elems = path[1..-1].split('/', -1)
-
-    vc = VirtualContext.new
-    lastdef = nil
+    elems = path.split('/')
 
     i = 0
+    vc = VirtualContext.new(@defs)
     @defs.zip(elems).map do |d, e|
-      lastdef = d
-
       # register field order
       vc.append_allfields(d.vars)
 
       # not enough elems, incomplete path
-      break if (e.nil? or e.empty?)
+      break if e.nil?
 
       # extract values
-      vc.append_values(d.parse_values(e))
-
-      # last token is multimatch, stop to complete it
-      break if (i == elems.size - 1 and is_multimatch(e))
+      vc.append_values(d.parse_values(e)) unless e.empty?
 
       i += 1
+
+      # last token is multimatch, stop to complete it
+      break if (i == elems.size and is_multimatch(e))
     end
 
-    vc.set_next(lastdef.vars, lastdef.format)
+#    puts (i - 1)
+
+    vc.set_current_index(i - 1)
 
     return vc
   end
@@ -108,45 +183,61 @@ class Rule
   def is_multimatch(s)
     return s.match(/[*?]/)
   end
+end
 
-  class RuleItem
-    attr_reader :vars, :format
+class RuleItem
+  attr_reader :vars, :format
 
-    def initialize(vars, format)
-      @vars = vars
-      @format = format
-    end
+  def initialize(vars, format)
+    @vars = vars
+    @format = format
+  end
 
-    def parse_values(s)
-      h = Hash.new
+  def parse_values(s)
+    h = Hash.new
 
-      pattern = @format.gsub(/\$\{(.*?)\}/, '(.*?)')
-      match = s.match("^#{pattern}$")
+    pattern = format_to_pattern(format)
+    match = s.match(pattern)
 
-      unless match.nil?
-        i = 1
-        @vars.each do |v|
-          h[v] = match[i]
-          i += 1
-        end
+    unless match.nil?
+      i = 1
+      @vars.each do |v|
+        break if match[i].nil?
+        h[v] = match[i]
+        i += 1
       end
-
-      return h
     end
+
+    return h
+  end
+
+  private
+
+  def format_to_pattern(format)
+    def opt(s)
+      return "(?:#{s})?"
+    end
+    def subs(format)
+      format.scan(/(.*?)\$\{(.*?)\}(.*)/) do |s|
+        rest = if s[2].empty? then "" else opt(subs(s[2])) end
+        return "#{s[0]}(.*?)#{rest}"
+      end
+    end
+    return /^#{subs(format)}$/
   end
 end
 
 
 
 class VirtualContext
-  attr_reader :coll, :nextvars, :allfields, :nextformat
+  attr_reader :allfields
 
-  def initialize()
+  def initialize(defs)
+    @defs = defs
     @values = {}
     @allfields = []
-    @nextvars = []
-    @nextformat = ""
     @coll = nil
+    @curridx = nil
   end
 
   def append_values(values)
@@ -157,9 +248,23 @@ class VirtualContext
     @allfields.concat(fields)
   end
 
-  def set_next(variables, format)
-    @nextvars = variables
-    @nextformat = format
+  def set_current_index(idx)
+    @curridx = idx
+  end
+
+  def curr()
+    return @defs[@curridx]
+  end
+
+  # return next def to complete (don't go further than last)
+  def next()
+    idx  = @curridx
+    idx += 1 unless full?
+    return @defs[idx]
+  end
+
+  def full?()
+    return @curridx == @defs.size - 1
   end
 
   def coll()
@@ -167,7 +272,9 @@ class VirtualContext
     return @coll
   end
 
+
   private
+
   # Build a coll structure that matches conditions in a Hash
   def make_coll_filters(values)
     coll = Xmms::Collection.universe
@@ -197,43 +304,6 @@ class VirtualContext
 end
 
 
-# Given a context, perform xmms2 actions
-class VirtualXmms2Browser
-  def initialize(conn)
-    @conn = conn
-  end
-
-  def list_current(ctx)
-    puts ctx.nextvars
-    res = @conn.coll_query_info(ctx.coll, ctx.nextvars, ctx.allfields)
-    res.wait
-    res.value.each do |dict|
-      s = ctx.nextformat.gsub(/\$\{(.*?)\}/) {|| dict[$1.to_sym]}
-      puts s
-    end
-  end
-
-  def list_next(ctx)
-    res = @conn.coll_query_info(ctx.coll, ctx.nextvars, ctx.allfields)
-    res.wait
-    res.value.each do |dict|
-      s = ctx.nextformat.gsub(/\$\{(.*?)\}/) {|| dict[$1.to_sym]}
-      puts s
-    end
-  end
-
-  def list_entries(ctx)
-    res = @conn.coll_query_ids(ctx.coll, ctx.allfields)
-    res.wait
-    res.value.each do |id|
-      info = @conn.medialib_get_info(id)
-      info.wait
-      dict = info.value
-      puts "#{dict[:tracknr]} - #{dict[:title]}"
-    end
-  end
-end
-
 
 # check args
 unless ARGV.size == 2
@@ -244,10 +314,9 @@ end
 # hello XMMS2
 x2 = Xmms::Client.new("browse")
 x2.connect
-show = VirtualXmms2Browser.new(x2)
 
 # Load grammmar from file
-vp = VirtualPaths.new
+vp = VirtualPaths.new(x2)
 fp = File.open("vpaths.conf")
 while(line = fp.gets)
   line.scan(/(.*?) = (.*)/) do |action, path|
@@ -255,17 +324,16 @@ while(line = fp.gets)
   end
 end
 
-# parse user input
-ctx = vp.match(ARGV[1])
+arg = ARGV[1]
 
 # display corresponding result
 case ARGV[0]
 when "complete"
-  show.list_current(ctx)
+  vp.complete_current(arg)
 when "browse"
-  show.list_next(ctx)
+  vp.list_next(arg)
 when "search"
-  show.list_entries(ctx)
+  vp.list_entries(arg)
 else
   puts "Invalid action: #{ARGV[0]}"
   exit(1)

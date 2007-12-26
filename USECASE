@@ -28,6 +28,15 @@ $ xmms2-browse browse //Arti*
 $ xmms2-browse search //Arti*
 -none-
 
+$ xmms2-browse complete //Artist/
+//Artists/-all artists-
+
+$ xmms2-browse browse //Artist/
+-all artists-
+
+$ xmms2-browse search //Artist/
+-all media-
+
 
 $ xmms2-browse complete //Artists/Ai
 //Artists/Air

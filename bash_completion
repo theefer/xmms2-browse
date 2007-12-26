@@ -1,0 +1,30 @@
+PROGNM="browse.rb"
+
+_xmms2browse_complete_func ()
+{
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    first="${COMP_WORDS[1]}"
+    hold=""
+
+    scrub='s/\([\\\>\\\<\\\(\\\)\\\";]\)/\\\1/g'
+
+    case "$first" in
+        browse|search)
+            hold=`$PROGNM complete "${cur}"`
+            prev=`echo ${cur} | sed -e 's,[^/]*$,,'`
+            COMPREPLY=($(compgen -W "${hold}" -P "${prev}" | sed "$scrub"))
+#            COMPREPLY=($(compgen -W "${hold}" -P "${prev}"))
+#            COMPREPLY=($(compgen -W "$($PROGNM complete "${cur}")" -P "${prev}"))
+#            COMPREPLY="$($PROGNM complete "${cur}")"
+            return 0
+            ;;
+        *)
+            hold="complete browse search"
+            COMPREPLY=($(compgen -W "${hold}" -S " " ${cur}))
+            return 0
+            ;;
+    esac
+            
+}
+# FIXME: no nospace for arg[1] ..
+complete -F _xmms2browse_complete_func -o nospace $PROGNM

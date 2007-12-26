@@ -7,7 +7,13 @@ end
 
 class NotVirtualPathException < InvalidPathException
   def initialize(name)
-    super("Not a valid virtual path!")
+    super(name)
+  end
+end
+
+class InvalidActionException < InvalidPathException
+  def initialize(name)
+    super(name)
   end
 end
 
