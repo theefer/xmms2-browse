@@ -1,0 +1,101 @@
+= CLI browsing expressions =
+
+* Idea (from IRC excerpt)
+
+  <theefer> About CLI browsing, I actually had an idea about a virtual
+            filesystem that you would use to browse.
+  <DraX> i have code for that somewhere
+  <DraX> fusefs of the medialib
+  <theefer> I wasn't thinking about fuse even, just virtual inside
+            the nycli
+  <theefer> (possibly exploited by tab completion as well)
+  <theefer> nyxmms2 browse //Air
+  <theefer> nyxmms2 browse //Albums/The*
+  <theefer> nyxmms2 browse //SomeColl/Year/2007
+  <theefer> nyxmms2 browse //Songs/Paranoid*
+  <DraX> interesting
+  <theefer> or even:
+  <theefer> nyxmms2 search //Artists/Pink<TAB>
+  <theefer> Pink  Pink Floyd
+  <theefer> nyxmms2 search //Artists/Pink\ Floyd/<TAB>
+  <theefer> Meddle  Animals  ...
+  <DraX> ew
+  <theefer> nyxmms2 search //Artists/Pink\ Floyd/Wish*
+  <DraX> i don't like that it assumes albums
+  <theefer> 01 - Shine on You ...
+  <theefer> nyxmms2 add
+  <theefer> # adds previous search result
+
+* Syntax
+
+///$artist
+  or
+///$any
+  or
+//*/$any
+(any category at all, or any property, or any chosen property,
+ or just the default action)
+
+//l<TAB>  =>  //Albums/
+//y<TAB>  =>  //Years/
+etc.
+
+
+Example Top categories:
+- Artists
+- Albums
+- Titles
+- Years
+- Genres
+- Composers
+- Collections
+- Playlists
+- Files       (redundant with browse $url)
+- History
+
+
+Mix with existing 'browse' command, which browses protocols?
+Then '//' is just a shortcut for 'mlib://'?
+No conflict with stupid samba '\\' ?
+
+
+//Artists/$artist/$album/$tracknr - $title
+  or
+//Artists/$artist/$year - $album/$tracknr - $title
+  => user customizable
+
+We could/should also maybe allow the user to have his own paths anyway:
+Artists = /$artist/$album/$tracknr - $title
+
+
+Bypass levels with a wildcard or a partial match:
+//Artists/Air/*/Radian
+//Artists/Air/The*/Radian
+//Artists//Moon Safari/Radian
+=> - * might be interpreted by the shell;
+     use another symbol, or nothing?
+   - possibly confusing if album=* and you see a list of
+     "$tracknr - $title" mixed;
+     unless they are sorted properly, i.e. by album!
+   - use to allow shortcuts: //l/ <=> //Albums/
+
+
+Browsing can list content, or list content recursively.
+Depth can be chosen.
+Display as ls -R or as a tree (anders' magic parser).
+
+
+Syntax used both with a browse (equivalent of ls) and a search
+command, as a filtering condition. In both cases, it should
+support contextual completion, including shell completion.
+
+
+
+* Roadmap
+
+  - Prototype in Python or Ruby
+    see [[http://inso.cc/gitp%3Dxmms2-browse.git%3Ba%3Dsummary][xmms2-browse.git repo (gitweb)]]
+        [[git://sirius.cine7.net/xmms2-browse.git][xmms2-browse.git repo]]
+  - Implement in C
+  - Integrate to the collparser?
+  - Make it a fusefs (really?)

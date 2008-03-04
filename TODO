@@ -1,0 +1,8 @@
+Known bugs:
+- browse appends a trailing / even to the last element (e.g. tracknr - title)
+- leading wildcard fails (e.g. .../Moon Safari/*Sexy Boy) if multiple keys in field
+
+Improvements:
+- 0-pad the tracknum for easier completion
+- when parsing tracknum and querying, transform to int (remove leading 0)
+- throw error if too many elements (e.g. title/foo/bar/...)
