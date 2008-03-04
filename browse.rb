@@ -131,8 +131,7 @@ class VirtualPaths
 
   def print_element(elem, terminal)
     elem += '/' unless terminal
-    puts elem.gsub(' ', '\ ')
-#    puts elem
+    puts elem
   end
 end
 
@@ -310,6 +309,8 @@ unless ARGV.size == 2
   puts "usage: browse.rb <complete|browse|search> PATH"
   exit(1)
 end
+
+# FIXME: handle exceptions here
 
 # hello XMMS2
 x2 = Xmms::Client.new("browse")

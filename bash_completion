@@ -2,29 +2,32 @@ PROGNM="browse.rb"
 
 _xmms2browse_complete_func ()
 {
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    first="${COMP_WORDS[1]}"
+    cur=${COMP_WORDS[COMP_CWORD]}
+    first=${COMP_WORDS[1]}
     hold=""
 
+# FIXME: completion still broken with spaces?
+
+# FIXME: lots of ugly regexp stuff, but I got stuck. please cleanup
     scrub='s/\([\\\>\\\<\\\(\\\)\\\";]\)/\\\1/g'
+#    scrub="s/\\([><()\"';]\\)/\\\\1/g"
 
     case "$first" in
         browse|search)
-            hold=`$PROGNM complete "${cur}"`
-            prev=`echo ${cur} | sed -e 's,[^/]*$,,'`
-            COMPREPLY=($(compgen -W "${hold}" -P "${prev}" | sed "$scrub"))
-#            COMPREPLY=($(compgen -W "${hold}" -P "${prev}"))
-#            COMPREPLY=($(compgen -W "$($PROGNM complete "${cur}")" -P "${prev}"))
-#            COMPREPLY="$($PROGNM complete "${cur}")"
+            local IFS=$'\n'
+            hold=`${PROGNM} complete "${cur}" | sed "$scrub" | sed "s,',\\\\\\',g"`
+#            hold=`${PROGNM} complete "${cur}" | sed 's/\([><()";]\)/\\1/g'`
+            prefix=`echo ${cur} | sed -e 's,[^/]*$,,'`
+            COMPREPLY=($(compgen -W "${hold}" -P "${prefix}" | sed "$scrub" | sed "s,',\\\\\\',g" | sed 's, ,\\\ ,g'))
             return 0
             ;;
         *)
             hold="complete browse search"
-            COMPREPLY=($(compgen -W "${hold}" -S " " ${cur}))
+            COMPREPLY=($(compgen -W "${hold}" "${cur}"))
             return 0
             ;;
     esac
             
 }
 # FIXME: no nospace for arg[1] ..
-complete -F _xmms2browse_complete_func -o nospace $PROGNM
+complete -F _xmms2browse_complete_func -o nospace ${PROGNM}
